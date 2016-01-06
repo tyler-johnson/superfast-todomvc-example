@@ -14,10 +14,30 @@
 
 	var addItem =
 	this.addItem = function(item, completed) {
-		return items.push(new Temple.Map({
-			value: item,
-			completed: completed || false
-		}));
+		var obj;
+		if (item && typeof item === "object") {
+			obj = item;
+			if (obj.completed == null) {
+				obj.completed = completed || false;
+			}
+		} else {
+			obj = {
+				value: item,
+				completed: completed || false
+			};
+		}
+
+		return items.push(new Temple.Map(obj));
+	};
+
+	var removeAllItems =
+	this.removeAllItems = function() {
+		items.splice(0, items.length);
+	};
+
+	this.resetItems = function(items) {
+		removeAllItems();
+		items.forEach(function(i) { addItem(i); });
 	};
 
 	var filters = {

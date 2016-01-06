@@ -11,6 +11,8 @@ App.methods({
 		});
 	},
 	saveItems: function(items) {
-		return fs.writeFile("todolist.json", JSON.stringify(items));
+		return fs.writeFile("todolist.json", JSON.stringify(items)).then(function() {
+			App.io.sockets.emit("todo-change");
+		});
 	}
 });
