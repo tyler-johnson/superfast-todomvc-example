@@ -1,0 +1,208 @@
+<todomvc-layout>
+	<script>
+	this.use("actions");
+	this.use("twoway");
+	var items = new Temple.List();
+	var filter = new Temple.Variable("all");
+	var editing = new Temple.Variable();
+
+	this.getItems = function() {
+		return items.map(function(i) {
+			return i.toJSON();
+		});
+	};
+
+	var addItem =
+	this.addItem = function(item, completed) {
+		return items.push(new Temple.Map({
+			value: item,
+			completed: completed || false
+		}));
+	};
+
+	var filters = {
+		all: function() {
+			return items;
+		},
+		active: function() {
+			return items.filter(function(i) {
+				return !i.get("completed");
+			});
+		},
+		completed: function() {
+			return items.filter(function(i) {
+				return i.get("completed");
+			});
+		}
+	};
+
+	this.helpers({
+		items: items,
+		activeItemsCount: function() {
+			return items.reduce(function(cnt, item) {
+				if (!item.get("completed")) cnt++;
+				return cnt;
+			}, 0);
+		},
+		completedItemsCount: function() {
+			return items.reduce(function(cnt, item) {
+				if (item.get("completed")) cnt++;
+				return cnt;
+			}, 0);
+		},
+
+		filter: filter,
+		"filter:all": function() { return filter.get() === "all"; },
+		"filter:active": function() { return filter.get() === "active"; },
+		"filter:completed": function() { return filter.get() === "completed"; },
+		filterItems: function() {
+			var fn = filters[filter.get()];
+			return typeof fn === "function" ? fn() : null;
+		},
+
+		editing: editing,
+		isEditing: function(v, ctx) {
+			return editing.get() === ctx.query("@index");
+		}
+	});
+
+	this.actions("add-todo", function(e) {
+		if (e.original.keyCode !== 13) return;
+		e.original.preventDefault();
+		addItem(e.target.value);
+		e.target.value = "";
+		e.target.focus();
+	});
+
+	this.twoway("complete", {
+		get: function(ctx) {
+			return ctx.query("completed");
+		},
+		change: function(v, ctx) {
+			ctx.query().set("completed", v);
+		}
+	});
+
+	this.actions("remove-todo", function(e, index) {
+		e.original.preventDefault();
+		items.splice(index, 1);
+	});
+
+	this.twoway("toggle-all", {
+		get: function() {
+			return items.every(function(item) {
+				return item.get("completed");
+			});
+		},
+		change: function(v) {
+			items.forEach(function(item) {
+				item.set("completed", v);
+			});
+		}
+	});
+
+	this.actions("clear-completed", function(e) {
+		e.original.preventDefault();
+		var indices = [];
+		items.forEach(function(item, index) {
+			if (item.get("completed")) indices.push(index);
+		});
+		// remove indices in reverse
+		indices.reverse().forEach(function(i) {
+			items.splice(i, 1);
+		});
+	});
+
+	this.actions("apply-filter", function(e, f) {
+		e.original.preventDefault();
+		filter.set(f);
+	});
+
+	var timeout;
+	this.actions("edit", function(e, index) {
+		e.original.preventDefault();
+		if (!timeout) {
+			timeout = setTimeout(function() {
+				timeout = null;
+			}, 300);
+			return;
+		}
+
+		clearTimeout(timeout);
+		timeout = null;
+
+		editing.set(index);
+	});
+
+	this.actions("save-item", function(e) {
+		e.original.preventDefault();
+		var index = editing.get();
+		if (index == null) return;
+		var item = items.get(index);
+		if (!item) return;
+		var val = e.target.value;
+		if (!val) items.splice(index, 1);
+		else item.set("value", val);
+		editing.set(null);
+	});
+
+	this.decorate("editfocus", function(d) {
+		if (d.comp.firstRun) {
+			d.target.focus();
+			var val = d.target.value;
+			d.target.value = "";
+			d.target.value = val;
+		}
+	});
+
+	this.actions("blur-enter", function(e) {
+		if (e.original.keyCode !== 13) return;
+		e.original.preventDefault();
+		e.target.blur();
+	});
+	</script>
+
+	<section class="todoapp">
+		<header class="header">
+			<h1>todos</h1>
+			<input class="new-todo" placeholder="What needs to be done?" autofocus on-keypress="add-todo" />
+		</header>
+		{{# items.length }}
+		<section class="main">
+			<input class="toggle-all" type="checkbox" bind-to="toggle-all" />
+			<label for="toggle-all">Mark all as complete</label>
+			<ul class="todo-list">
+				{{# filterItems }}
+				<li class="{{# completed }}completed{{/ completed }} {{# isEditing }}editing{{/ isEditing }}">
+					<div class="view">
+						<input class="toggle" type="checkbox" bind-to="complete" />
+						<label on-click="edit, {{ @index }}">{{ value }}</label>
+						<button class="destroy" on-click="remove-todo, {{ @index }}"></button>
+					</div>
+					{{# isEditing }}
+					<input class="edit" value="{{ value }}" on-blur="save-item" on-keypress="blur-enter" editfocus />
+					{{/ isEditing }}
+				</li>
+				{{/ filterItems }}
+			</ul>
+		</section>
+		<footer class="footer">
+			<span class="todo-count">{{ activeItemsCount }} items left</span>
+			<ul class="filters">
+				<li><a href="#" on-click="apply-filter, all" class="{{# filter:all }}selected{{/ filter:all }}">All</a></li>
+				<li><a href="#" on-click="apply-filter, active" class="{{# filter:active }}selected{{/ filter:active }}">Active</a></li>
+				<li><a href="#" on-click="apply-filter, completed" class="{{# filter:completed }}selected{{/ filter:completed }}">Completed</a></li>
+			</ul>
+			{{# completedItemsCount }}
+			<button class="clear-completed" on-click="clear-completed">Clear completed</button>
+			{{/ completedItemsCount }}
+		</footer>
+		{{/ items.length }}
+	</section>
+	<footer class="info">
+		<p>Double-click to edit a todo</p>
+		<p>Created by <a href="http://twitter.com/oscargodson">Oscar Godson</a></p>
+		<p>Refactored by <a href="https://github.com/cburgmer">Christoph Burgmer</a></p>
+		<p>Part of <a href="http://todomvc.com">TodoMVC</a></p>
+	</footer>
+</todomvc-layout>
