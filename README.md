@@ -7,5 +7,6 @@ To run locally, you will need the Superfast CLI tool installed, as well as local
 ```bash
 $ npm i superfast -g
 $ npm i
+$ superfast init
 $ superfast
 ```
